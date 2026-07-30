@@ -16,87 +16,93 @@ If you (or your coding agent) find yourselves adding features beyond what's in t
 
 ---
 
-## CHUNK 1 — Demo App (Locked)
+## CHUNK 1 — Demo App (Locked — Updated)
 
-A minimal Flask app, `demo-app/app.py`:
+A minimal FastAPI app, `demo-app/app.py`:
 
 ```python
 import os
-from flask import Flask, jsonify
+from fastapi import FastAPI, HTTPException
 
-app = Flask(__name__)
+app = FastAPI(title="TaskAPI Demo")
+
 BUG_MODE = os.environ.get("INJECT_BUG", "false").lower() == "true"
+ENV_NAME = os.environ.get("ENV_NAME", "unknown")
+IMAGE_TAG = os.environ.get("IMAGE_TAG", "local")
 
-@app.route("/health")
+@app.get("/health")
 def health():
     if BUG_MODE:
-        return jsonify({"status": "error", "detail": "simulated failure"}), 500
-    return jsonify({"status": "ok"}), 200
+        raise HTTPException(status_code=500, detail="simulated failure")
+    return {"status": "ok"}
 
-@app.route("/tasks")
+@app.get("/tasks")
 def tasks():
     if BUG_MODE:
         raise Exception("simulated crash")
-    return jsonify({"tasks": ["write report", "review PR", "deploy app"]}), 200
+    return {"tasks": ["write report", "review PR", "deploy app"]}
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
+@app.get("/version")
+def version():
+    return {"version": IMAGE_TAG, "environment": ENV_NAME}
 ```
 
-`Dockerfile` for this app: standard Python slim base, copy app, `pip install flask`, `CMD ["python", "app.py"]`.
+`Dockerfile` for this app: standard Python slim base, copy app, `pip install fastapi uvicorn`, `CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8080"]`.
 
-**Definition of done:** running the container with `INJECT_BUG=false` returns 200 on `/health` and `/tasks`; with `INJECT_BUG=true` returns 500 / crashes. This toggle is how you simulate failures for demos and rollback testing — no need for a real bug.
+**Definition of done:** running the container with `INJECT_BUG=false` returns 200 on `/health`, `/tasks`, and `/version`; with `INJECT_BUG=true` returns 500 / crashes. The `/version` endpoint always works regardless of bug mode.
 
 ---
 
-## CHUNK 2 — Environments (Locked)
+## CHUNK 2 — Environments (Locked — docker-compose)
 
-Three deployments of the same image, differing only by the `INJECT_BUG` env var and a `ENV_NAME` label:
+Three deployments of the same image via **docker-compose**, differing by `ENV_NAME` and `INJECT_BUG`:
 
-| Environment | Fly.io app name (or docker-compose service) | Port (if local) |
+| Environment | docker-compose service | Port |
 |---|---|---|
 | dev | `taskapi-dev` | 8081 |
 | staging | `taskapi-staging` | 8082 |
 | prod | `taskapi-prod` | 8083 |
 
-**Choose ONE deployment method and lock it in:**
-- **Fly.io path (recommended if you want "real" URLs for the demo):** `fly launch` once per environment name, `fly deploy --app taskapi-<env>` to promote.
-- **docker-compose path (recommended if you want zero cloud setup):** one `docker-compose.yml` with three services (`dev`, `staging`, `prod`) all built from the same image, differing only in the `INJECT_BUG` env var and exposed port. "Promotion" = restarting the next service with the new image tag.
+**Deployment method: docker-compose** (locked). One `docker-compose.yml` with three services, all built from the same image, differing only in env vars and exposed port. "Promotion" = restarting the next service with the new image tag.
 
-**Definition of done:** all three environments are independently reachable (three URLs or three localhost ports) and each returns 200 on `/health` by default.
+**End goal:** Push images to DockerHub and deploy to Render for production demo URLs.
+
+**Definition of done:** all three environments are independently reachable (three localhost ports) and each returns 200 on `/health` by default.
 
 ---
 
-## CHUNK 3 — Database / Audit Log (Locked)
+## CHUNK 3 — Database / Audit Log (Locked — SQLite)
+
+Using **SQLite** for simplicity (zero setup, file-based). Can swap to PostgreSQL for Render deployment later.
 
 ```sql
-CREATE TABLE pr_reviews (
-    id SERIAL PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS pr_reviews (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     pr_number INTEGER NOT NULL,
     verdict TEXT NOT NULL CHECK (verdict IN ('approved', 'changes_requested')),
     reasoning TEXT NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT now()
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE TABLE deployments (
-    id SERIAL PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS deployments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     environment TEXT NOT NULL CHECK (environment IN ('dev', 'staging', 'prod')),
     image_tag TEXT NOT NULL,
     status TEXT NOT NULL CHECK (status IN ('deployed', 'smoke_test_passed', 'smoke_test_failed', 'rolled_back')),
     triggered_by TEXT,
-    created_at TIMESTAMP NOT NULL DEFAULT now()
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE TABLE rollbacks (
-    id SERIAL PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS rollbacks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     deployment_id INTEGER REFERENCES deployments(id),
     reasoning TEXT NOT NULL,
     reverted_to_tag TEXT NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT now()
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 ```
 
-**Definition of done:** three tables exist; a manual `INSERT` into each succeeds.
+**Definition of done:** three tables exist in `backend/db/audit.db`; a manual `INSERT` into each succeeds.
 
 ---
 
@@ -106,11 +112,11 @@ CREATE TABLE rollbacks (
 ```json
 {
   "name": "github_tool",
-  "description": "Interact with the demo repo on GitHub: fetch PR diffs, post PR comments, add labels.",
+  "description": "Interact with the demo repo on GitHub: fetch PR diffs, post PR comments, add labels, approve or merge PRs.",
   "input_schema": {
     "type": "object",
     "properties": {
-      "action": { "type": "string", "enum": ["get_diff", "post_comment", "add_label"] },
+      "action": { "type": "string", "enum": ["get_diff", "post_comment", "add_label", "approve_pr", "merge_pr"] },
       "pr_number": { "type": "integer" },
       "comment_body": { "type": "string" },
       "label": { "type": "string" }
@@ -152,9 +158,9 @@ Implementation: a single POST to your Slack Incoming Webhook URL with `{"text": 
   }
 }
 ```
-- `deploy`: redeploys the given environment with `image_tag` (Fly.io: `fly deploy`; docker-compose: restart service with new image)
+- `deploy`: redeploys the given environment with `image_tag` (docker-compose: restart service with new image)
 - `rollback`: redeploys the environment with the last known-good tag (query `deployments` table for the most recent `smoke_test_passed` row for that environment)
-- `run_smoke_test`: hits `/health` and `/tasks` on that environment's URL, returns pass/fail
+- `run_smoke_test`: hits `/health`, `/tasks`, and `/version` on that environment's URL, returns pass/fail. **Uses retry logic** (3 attempts, 2s apart) to handle container startup delay.
 
 ### Tool 4: `db_tool`
 ```json
@@ -174,7 +180,10 @@ Implementation: a single POST to your Slack Incoming Webhook URL with `{"text": 
 
 ---
 
-## CHUNK 5 — Agent Decision Logic (Locked)
+## CHUNK 5 — Agent Decision Logic (Locked — Groq / Llama 3.3)
+
+**LLM Provider:** Groq API (Llama 3.3) — free tier, fast inference, tool-calling capable.
+**Target repo:** A separate demo repo (e.g., `taskapi-demo`) — keeps pipeline code separate from test PRs.
 
 ### Decision 1 — PR Review (system prompt)
 ```
@@ -186,6 +195,7 @@ Check against this rubric:
 
 Respond with a verdict: "approved" or "changes_requested", plus 2-3 sentences of reasoning.
 Post this as a PR comment using github_tool, and log it using db_tool.
+If approved, call github_tool with action=approve_pr.
 ```
 
 ### Decision 2/3/4 — Promotion Gate (same logic reused per environment)

@@ -89,15 +89,16 @@ An agent embedded in a CI/CD pipeline that owns the full path from code change t
 | Layer | Choice | Why |
 |---|---|---|
 | CI trigger | GitHub Actions | Real pipeline, industry-standard |
-| Agent backend | FastAPI (Python) | Reuse pattern from Project 1 |
-| LLM | Groq API (Llama 3.3) or Ollama local | Free, tool-calling capable |
+| Agent backend | FastAPI (Python) | Consistent with demo app |
+| LLM | Groq API (Llama 3.3) | Free tier, fast, tool-calling capable |
 | Tool protocol | MCP | Same protocol as Project 1 — consistent story across both projects |
-| Demo app | Tiny Flask/Express API with an `INJECT_BUG` env var toggle | Lets you trigger real failures on demand for demos, no need for a "real" bug |
-| Deploy target | Fly.io (3 free apps) or docker-compose (3 local services) | Zero/near-zero cost, minimal setup |
-| Database | PostgreSQL | Audit log: PR reviews, promotions, rollbacks |
+| Demo app | FastAPI with `INJECT_BUG` + `/version` env var toggles | Lets you trigger real failures on demand + verify promotions visually |
+| Deploy target | docker-compose (3 local services) → DockerHub + Render | Local dev first, cloud deploy for demo URLs |
+| Database | SQLite (initial) → PostgreSQL (for Render) | Zero setup locally, swap later for production |
 | Messaging | Slack Incoming Webhook | Real integration, simple to set up |
 | Containerization | Docker | Same image promoted across environments |
-| Dashboard | Minimal React page or even a simple `/admin` HTML view | Shows audit trail — don't over-invest here given time constraints |
+| Dashboard | Minimal React page or simple `/admin` HTML view | Shows audit trail — don't over-invest here |
+| Target repo | Separate repo (e.g., `taskapi-demo`) | Keeps pipeline code separate from test PRs |
 
 ---
 
