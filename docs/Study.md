@@ -30,15 +30,15 @@
 
 ---
 
-## Chunk 3 — Database (SQLite)
+## Chunk 3 — Database (PostgreSQL via Docker)
 
 | Topic | Depth | What to Know |
 |---|---|---|
 | SQL basics | **Basic** | `CREATE TABLE`, `INSERT`, `SELECT`, `CHECK` constraints. |
-| SQLite | **Basic** | File-based database, no server needed. Python has built-in `sqlite3` module. |
-| Python `sqlite3` module | **Basic** | `connect()`, `cursor()`, `execute()`, `commit()`. ~20 min tutorial. |
+| Postgres + Docker | **Basic** | Running the `postgres` image, mounting initialization scripts to `/docker-entrypoint-initdb.d/`. |
+| Python `psycopg2` module | **Basic** | How to connect to Postgres from Python, execute queries, and commit. |
 
-**Total prep: ~30 min if you know SQL.**
+**Total prep: ~30-45 min if you know SQL.**
 
 ---
 

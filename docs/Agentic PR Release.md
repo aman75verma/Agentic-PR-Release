@@ -94,7 +94,7 @@ An agent embedded in a CI/CD pipeline that owns the full path from code change t
 | Tool protocol | MCP | Same protocol as Project 1 — consistent story across both projects |
 | Demo app | FastAPI with `INJECT_BUG` + `/version` env var toggles | Lets you trigger real failures on demand + verify promotions visually |
 | Deploy target | docker-compose (3 local services) → DockerHub + Render | Local dev first, cloud deploy for demo URLs |
-| Database | SQLite (initial) → PostgreSQL (for Render) | Zero setup locally, swap later for production |
+| Database | PostgreSQL (via Docker) | Production-grade, easy to deploy to Render |
 | Messaging | Slack Incoming Webhook | Real integration, simple to set up |
 | Containerization | Docker | Same image promoted across environments |
 | Dashboard | Minimal React page or simple `/admin` HTML view | Shows audit trail — don't over-invest here |

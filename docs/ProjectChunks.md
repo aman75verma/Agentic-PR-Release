@@ -71,13 +71,13 @@ Three deployments of the same image via **docker-compose**, differing by `ENV_NA
 
 ---
 
-## CHUNK 3 — Database / Audit Log (Locked — SQLite)
+## CHUNK 3 — Database / Audit Log (Locked — PostgreSQL via Docker)
 
-Using **SQLite** for simplicity (zero setup, file-based). Can swap to PostgreSQL for Render deployment later.
+Using **PostgreSQL via Docker** to closely mimic production and simplify later deployment to Render.
 
 ```sql
 CREATE TABLE IF NOT EXISTS pr_reviews (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     pr_number INTEGER NOT NULL,
     verdict TEXT NOT NULL CHECK (verdict IN ('approved', 'changes_requested')),
     reasoning TEXT NOT NULL,
@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS pr_reviews (
 );
 
 CREATE TABLE IF NOT EXISTS deployments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     environment TEXT NOT NULL CHECK (environment IN ('dev', 'staging', 'prod')),
     image_tag TEXT NOT NULL,
     status TEXT NOT NULL CHECK (status IN ('deployed', 'smoke_test_passed', 'smoke_test_failed', 'rolled_back')),
@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS deployments (
 );
 
 CREATE TABLE IF NOT EXISTS rollbacks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     deployment_id INTEGER REFERENCES deployments(id),
     reasoning TEXT NOT NULL,
     reverted_to_tag TEXT NOT NULL,
@@ -102,7 +102,7 @@ CREATE TABLE IF NOT EXISTS rollbacks (
 );
 ```
 
-**Definition of done:** three tables exist in `backend/db/audit.db`; a manual `INSERT` into each succeeds.
+**Definition of done:** `schema_pg.sql` is mounted to `/docker-entrypoint-initdb.d/` in a `docker-compose.yml` db service. Postgres initializes correctly and manual `INSERT` statements succeed.
 
 ---
 
