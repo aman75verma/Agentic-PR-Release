@@ -18,3 +18,8 @@
   - `deploy_tool.py` — Docker-compose management (deploy, rollback, run_smoke_test with 3-attempt retry)
   - Created `backend/config.py` for centralized secrets/settings and `backend/.env.example`
   - All 7 tests passed: DB writes, DB reads, smoke test against live dev container, and Slack graceful skip
+- **Implemented Chunks 5 and 6:** 
+  - Created `backend/agent/prompts.py` with strict JSON rubrics for PR review and Promotion gates.
+  - Created `backend/agent/review_agent.py` to fetch PR diffs, query Llama 3.3 for a verdict, post GitHub comments, and log to Postgres.
+  - Created `backend/agent/promotion_agent.py` to orchestrate sequential deployment (dev → staging → prod), smoke testing, LLM decision making, and auto-rollback.
+  - Created `backend/main.py` (FastAPI) exposing `/webhook/pr` and `/webhook/merge` (triggering agents via background tasks) and `/admin/audit-log`. Tested server startup and endpoints.
