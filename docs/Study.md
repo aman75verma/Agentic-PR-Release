@@ -111,3 +111,19 @@ These aren't deep-study topics — just make sure you can explain each in 1-2 se
 | **Webhook** | "Don't call me, I'll call you" — a server notifies your URL when events happen |
 | **Agent loop** | LLM decides → calls tool → gets result → decides again (repeat until done) |
 | **Docker image tag** | Version label on a container image (often the git commit SHA) |
+
+---
+
+## Deep Dive Concepts
+
+### 1. How Rollback & Version Tracking Works
+- **Git Commit SHA to Docker Tag:** Every code commit generates a unique hash (e.g., `a1b2c3d`). The build pipeline tags the Docker image with this SHA (`taskapi:a1b2c3d`).
+- **Postgres as Pipeline Memory:** When a deployment passes its smoke test, Postgres logs `(environment, image_tag, 'smoke_test_passed')`.
+- **Rollback Mechanism:** If a future deployment fails, `deploy_tool.rollback()` queries Postgres via `get_last_good_tag` for the most recent passing tag and redeploys that exact image version.
+
+### 2. Context Required for LLM PR Reviews
+To decide whether to approve a PR or request changes, the LLM receives high-signal context:
+- **PR Diff:** Line-by-line code additions/deletions fetched via `github_tool.get_diff()`.
+- **Fixed Rubric:** System prompt constraints (checking for hardcoded secrets, presence of tests, and reasonable diff size).
+- **PR Metadata:** PR title and description to understand intent.
+
