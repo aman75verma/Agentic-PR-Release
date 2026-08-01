@@ -23,3 +23,6 @@
   - Created `backend/agent/review_agent.py` to fetch PR diffs, query Llama 3.3 for a verdict, post GitHub comments, and log to Postgres.
   - Created `backend/agent/promotion_agent.py` to orchestrate sequential deployment (dev → staging → prod), smoke testing, LLM decision making, and auto-rollback.
   - Created `backend/main.py` (FastAPI) exposing `/webhook/pr` and `/webhook/merge` (triggering agents via background tasks) and `/admin/audit-log`. Tested server startup and endpoints.
+- **Implemented Chunk 7:**
+  - Created `.github/workflows/pr_review.yml` to trigger the `review_agent` when a PR is opened.
+  - Created `.github/workflows/merge_promotion.yml` to build/push a Docker image to Docker Hub and trigger the `promotion_agent` when a PR is merged to `main`.
