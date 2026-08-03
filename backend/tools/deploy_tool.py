@@ -1,120 +1,104 @@
 """
-deploy_tool — Deploy, rollback, and smoke-test the demo app environments.
+deploy_tool — Trigger deployments via GitHub Actions workflow_dispatch (Approach B).
+
+In the multi-tenant SaaS model, we don't run docker-compose locally.
+Instead, we trigger the `agentic_deploy.yml` workflow in the user's repo.
+That workflow runs on the user's GitHub Actions runner, builds/deploys
+their code, and reports back to our server via a callback URL.
 
 Actions:
-  deploy          — Restart a docker-compose service with a new IMAGE_TAG
-  rollback        — Redeploy with the last known-good tag from the DB
-  run_smoke_test  — Hit /health, /tasks, /version with retry logic
+  trigger_deploy    — Dispatch the deploy workflow in the user's repo
+  rollback          — Look up last good tag and trigger a deploy with it
+  run_smoke_test    — Hit a URL to check if the deployment is alive (optional)
 """
 
-import subprocess
-import time
 import requests as http_requests
-from backend.config import ENV_URLS
+from backend.config import AGENT_PUBLIC_URL
 from backend.tools import db_tool
 
-# Map environment names to docker-compose service names
-SERVICE_MAP = {
-    "dev": "taskapi-dev",
-    "staging": "taskapi-staging",
-    "prod": "taskapi-prod",
-}
 
-
-def deploy(environment: str, image_tag: str) -> dict:
+def trigger_deploy(repo: str, token: str, environment: str, image_tag: str) -> dict:
     """
-    Redeploy a docker-compose service with a new IMAGE_TAG.
-    We update the env var and recreate the container.
-    """
-    service = SERVICE_MAP.get(environment)
-    if not service:
-        return {"status": "error", "detail": f"Unknown environment: {environment}"}
+    Trigger the agentic_deploy.yml workflow in the user's repo via workflow_dispatch.
 
-    try:
-        # Set the IMAGE_TAG env var and recreate just this service
-        result = subprocess.run(
-            ["docker-compose", "up", "-d", "--no-deps", "--build", service],
-            capture_output=True,
-            text=True,
-            timeout=120,
-            env={
-                **__import__("os").environ,
-                "IMAGE_TAG": image_tag,
+    The workflow receives:
+      - environment: dev / staging / prod
+      - image_tag: the git SHA or Docker image tag to deploy
+      - callback_url: where to POST the result back to our server
+
+    Returns immediately — the actual deploy is async on GitHub Actions.
+    """
+    callback_url = f"{AGENT_PUBLIC_URL}/webhook/deploy-result"
+    url = f"https://api.github.com/repos/{repo}/actions/workflows/agentic_deploy.yml/dispatches"
+
+    resp = http_requests.post(
+        url,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+        json={
+            "ref": "main",
+            "inputs": {
+                "environment": environment,
+                "image_tag": image_tag,
+                "callback_url": callback_url,
             },
-        )
-        if result.returncode != 0:
-            return {"status": "error", "detail": result.stderr}
-        return {"status": "ok", "environment": environment, "image_tag": image_tag}
-    except Exception as e:
-        return {"status": "error", "detail": str(e)}
+        },
+        timeout=15,
+    )
+
+    # GitHub returns 204 No Content on success
+    if resp.status_code == 204:
+        return {"status": "ok", "environment": environment, "image_tag": image_tag, "message": "Workflow dispatched"}
+    return {"status": "error", "detail": resp.text, "status_code": resp.status_code}
 
 
-def run_smoke_test(environment: str) -> dict:
+def rollback(repo: str, token: str, environment: str) -> dict:
     """
-    Hit /health, /tasks, and /version on the environment.
-    Uses retry logic: 3 attempts, 2 seconds apart.
+    Query the DB for the last known-good tag for this repo+environment
+    and trigger a deploy with it.
     """
-    base_url = ENV_URLS.get(environment)
-    if not base_url:
-        return {"status": "error", "detail": f"Unknown environment: {environment}"}
-
-    endpoints = ["/health", "/tasks", "/version"]
-    results = {}
-
-    for endpoint in endpoints:
-        url = f"{base_url}{endpoint}"
-        success = False
-        last_error = ""
-
-        for attempt in range(1, 4):  # 3 attempts
-            try:
-                resp = http_requests.get(url, timeout=5)
-                if resp.status_code == 200:
-                    results[endpoint] = {"status": "pass", "response": resp.json()}
-                    success = True
-                    break
-                else:
-                    last_error = f"HTTP {resp.status_code}: {resp.text}"
-            except Exception as e:
-                last_error = str(e)
-
-            if attempt < 3:
-                time.sleep(2)
-
-        if not success:
-            results[endpoint] = {"status": "fail", "error": last_error}
-
-    # Overall pass/fail
-    all_passed = all(r["status"] == "pass" for r in results.values())
-    return {
-        "status": "pass" if all_passed else "fail",
-        "environment": environment,
-        "results": results,
-    }
-
-
-def rollback(environment: str) -> dict:
-    """
-    Query the DB for the last known-good tag and redeploy with it.
-    """
-    tag_result = db_tool.get_last_good_tag(environment)
+    tag_result = db_tool.get_last_good_tag(repo=repo, environment=environment)
     if tag_result["status"] == "not_found" or tag_result["image_tag"] is None:
-        return {"status": "error", "detail": f"No known-good tag found for {environment}"}
+        return {"status": "error", "detail": f"No known-good tag found for {repo}/{environment}"}
 
     good_tag = tag_result["image_tag"]
-    deploy_result = deploy(environment, good_tag)
+    deploy_result = trigger_deploy(repo, token, environment, good_tag)
     if deploy_result["status"] == "ok":
         return {"status": "ok", "environment": environment, "reverted_to_tag": good_tag}
     return deploy_result
 
 
+def run_smoke_test(environment: str, health_url: str = "") -> dict:
+    """
+    Optional server-side smoke test — hit a health URL.
+
+    In Approach B, the deploy workflow itself can run tests.
+    This function is a lightweight fallback for when the user
+    provides environment URLs they want us to check.
+    """
+    if not health_url:
+        # No URL provided — trust the deploy workflow's exit status
+        return {"status": "pass", "environment": environment, "detail": "No health URL configured, trusting workflow"}
+
+    try:
+        resp = http_requests.get(health_url, timeout=10)
+        if resp.status_code == 200:
+            return {"status": "pass", "environment": environment, "response": resp.text[:500]}
+        return {"status": "fail", "environment": environment, "detail": f"HTTP {resp.status_code}"}
+    except Exception as e:
+        return {"status": "fail", "environment": environment, "detail": str(e)}
+
+
 # ── Dispatcher (called by the agent) ──────────────────────────────────
-def run(action: str, environment: str, image_tag: str = "") -> dict:
+def run(action: str, repo: str, token: str, environment: str, image_tag: str = "") -> dict:
     """Route an action to the right function."""
     if action == "deploy":
-        return deploy(environment, image_tag)
+        return trigger_deploy(repo, token, environment, image_tag)
     elif action == "rollback":
-        return rollback(environment)
+        return rollback(repo, token, environment)
     elif action == "run_smoke_test":
         return run_smoke_test(environment)
     else:

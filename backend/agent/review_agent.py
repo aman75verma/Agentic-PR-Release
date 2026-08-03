@@ -1,8 +1,8 @@
 """
-review_agent.py — Decision 1: PR Review
+review_agent.py — Decision 1: PR Review (multi-tenant)
 
-Takes a PR number, fetches the diff from GitHub, sends it to the LLM
-with the review rubric, and posts the verdict as a PR comment.
+Takes a PR number + repo + token, fetches the diff from GitHub,
+sends it to the LLM with the review rubric, and posts the verdict as a PR comment.
 """
 
 import json
@@ -15,17 +15,19 @@ from backend.tools import github_tool, db_tool
 client = Groq(api_key=GROQ_API_KEY)
 
 
-def review_pr(pr_number: int) -> dict:
+def review_pr(pr_number: int, repo: str, token: str) -> dict:
     """
-    Full PR review flow:
-    1. Fetch diff from GitHub
+    Full PR review flow (multi-tenant):
+    1. Fetch diff from GitHub using the repo owner's token
     2. Send diff + rubric to LLM
     3. Post verdict as PR comment
     4. If approved, submit an approving review
-    5. Log the review in Postgres
+    5. Log the review in Postgres with repo context
     """
+    print(f"[review_agent] Starting review for PR #{pr_number} on {repo}")
+
     # Step 1: Get the PR diff
-    diff_result = github_tool.get_diff(pr_number)
+    diff_result = github_tool.get_diff(pr_number, repo=repo, token=token)
     if diff_result["status"] != "ok":
         return {"status": "error", "detail": f"Failed to fetch diff: {diff_result}"}
 
@@ -40,7 +42,7 @@ def review_pr(pr_number: int) -> dict:
         model="llama-3.3-70b-versatile",
         messages=[
             {"role": "system", "content": PR_REVIEW_SYSTEM_PROMPT},
-            {"role": "user", "content": f"Here is the PR diff for PR #{pr_number}:\n\n```diff\n{diff_text}\n```"},
+            {"role": "user", "content": f"Here is the PR diff for PR #{pr_number} on {repo}:\n\n```diff\n{diff_text}\n```"},
         ],
         temperature=0.2,
         max_tokens=500,
@@ -60,17 +62,19 @@ def review_pr(pr_number: int) -> dict:
 
     # Step 4: Post comment on the PR
     comment_body = f"## 🤖 Agent PR Review\n\n**Verdict:** `{verdict}`\n\n**Reasoning:** {reasoning}"
-    github_tool.post_comment(pr_number, comment_body)
+    github_tool.post_comment(pr_number, comment_body, repo=repo, token=token)
 
     # Step 5: If approved, submit an approving review
     if verdict == "approved":
-        github_tool.approve_pr(pr_number)
+        github_tool.approve_pr(pr_number, repo=repo, token=token)
 
-    # Step 6: Log in Postgres
-    db_tool.log_review(pr_number=pr_number, verdict=verdict, reasoning=reasoning)
+    # Step 6: Log in Postgres with repo context
+    db_tool.log_review(repo=repo, pr_number=pr_number, verdict=verdict, reasoning=reasoning)
 
+    print(f"[review_agent] PR #{pr_number} on {repo}: {verdict}")
     return {
         "status": "ok",
+        "repo": repo,
         "pr_number": pr_number,
         "verdict": verdict,
         "reasoning": reasoning,
