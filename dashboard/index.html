@@ -114,8 +114,8 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 .btn-outline:hover { border-color: var(--accent-1); color: var(--accent-1); }
 .btn-ghost { background: transparent; color: var(--text-secondary); padding: 8px 14px; }
 .btn-ghost:hover { color: var(--text-primary); background: var(--bg-tertiary); }
-.btn-danger-ghost { background: transparent; color: var(--text-muted); font-size: 0.82rem; padding: 6px 12px; }
-.btn-danger-ghost:hover { color: var(--danger); }
+.btn-danger { background: rgba(239,68,68,0.1); color: var(--danger); font-size: 0.82rem; padding: 6px 12px; border: 1px solid rgba(239,68,68,0.3); }
+.btn-danger:hover { background: rgba(239,68,68,0.2); border-color: rgba(239,68,68,0.5); }
 .btn-sm { padding: 7px 16px; font-size: 0.82rem; }
 .btn-lg { padding: 14px 32px; font-size: 1rem; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
@@ -489,11 +489,28 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
      ═══════════════════════════════════════════════════════════════════════ -->
 <div class="page" id="page-repos">
     <div class="container">
-        <div class="page-header">
-            <h1>Your Repositories</h1>
-            <div class="search-box">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-                <input type="text" id="repo-search" placeholder="Search repos..." oninput="filterRepos()">
+        <div class="dash-header" style="margin-bottom: 2rem;">
+            <div class="dash-header-left">
+                <h1 id="repos-greeting">Control Center</h1>
+                <p class="setup-sub" style="margin-top:4px">Manage your repositories and enable AI DevOps.</p>
+            </div>
+            <div class="dash-header-right">
+                <div class="search-box">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                    <input type="text" id="repo-search" placeholder="Search repos..." oninput="filterRepos()">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Global Stats -->
+        <div class="stats-grid" id="global-stats-grid" style="margin-bottom: 2rem;">
+            <div class="card stat-card">
+                <div class="stat-icon purple"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg></div>
+                <div><div class="stat-value" id="global-stat-total">—</div><div class="stat-label">Total Repositories</div></div>
+            </div>
+            <div class="card stat-card">
+                <div class="stat-icon green"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+                <div><div class="stat-value" id="global-stat-active">—</div><div class="stat-label">Active Monitored</div></div>
             </div>
         </div>
         <div class="repos-grid" id="repos-grid">
@@ -538,7 +555,7 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
                     Auto-refresh
                     <div class="toggle-switch on" id="auto-refresh-toggle"></div>
                 </label>
-                <button class="btn btn-danger-ghost" onclick="showDisconnectModal()">Disconnect</button>
+                <button class="btn btn-danger" onclick="showDisconnectModal()">Disconnect</button>
             </div>
         </div>
 
@@ -562,7 +579,8 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
             </div>
         </div>
 
-        <!-- Pipeline -->
+        <!-- Active Environments Pipeline -->
+        <h3 style="margin-bottom: 1rem; margin-top: 1rem; color: var(--text-secondary); font-size: 1.1rem;">Active Environments</h3>
         <div class="pipeline" id="pipeline-viz">
             <div class="pipeline-stage">
                 <div class="pipeline-stage-box pending" id="pipe-dev">DEV<span class="pipeline-tag" id="pipe-dev-tag">—</span></div>
@@ -703,6 +721,15 @@ async function loadRepos() {
     if (data.status !== 'ok') { grid.innerHTML = '<div class="empty-state"><h3>Could not load repos</h3></div>'; return; }
 
     allRepos = data.repos;
+    const activeCount = allRepos.filter(r => r.enabled).length;
+    
+    document.getElementById('global-stat-total').textContent = allRepos.length;
+    document.getElementById('global-stat-active').textContent = activeCount;
+    if (currentUser) {
+        const name = currentUser.display_name || currentUser.username || 'there';
+        document.getElementById('repos-greeting').textContent = `Welcome back, ${name.split(' ')[0]}!`;
+    }
+
     renderRepos(allRepos);
 }
 
@@ -730,7 +757,7 @@ function renderRepos(repos) {
                     ? `<span class="badge badge-success">✓ Active</span>
                        <span>
                            <a href="#/dashboard/${r.full_name}" class="btn btn-ghost btn-sm">Dashboard →</a>
-                           <button class="btn btn-danger-ghost" onclick="disconnectFromList('${r.full_name}')">Disconnect</button>
+                           <button class="btn btn-danger" onclick="disconnectFromList('${r.full_name}')">Disconnect</button>
                        </span>`
                     : `<span></span><button class="btn btn-primary btn-sm" onclick="enableRepo('${r.full_name}', '${(r.description||'').replace(/'/g,"\\'")}', '${r.language}')">Enable</button>`
                 }
@@ -893,15 +920,16 @@ async function loadDeployments(owner, name) {
     if (data.status === 'ok' && data.deployments.length > 0) {
         container.innerHTML = data.deployments.map((d, i) => {
             const statusMap = { deployed:'badge-info', smoke_test_passed:'badge-success', smoke_test_failed:'badge-danger', rolled_back:'badge-danger' };
+            const labelMap = { deployed:'Deployed', smoke_test_passed:'Smoke Test Passed', smoke_test_failed:'Smoke Test Failed', rolled_back:'Rolled Back' };
             const badgeCls = statusMap[d.status] || 'badge-neutral';
-            const label = d.status.replace(/_/g, ' ');
+            const label = labelMap[d.status] || d.status.replace(/_/g, ' ');
             return `<div class="data-row">
-                <span class="badge ${badgeCls}">${label}</span>
                 <div class="data-row-main">
-                    <div class="data-row-title">${d.environment.toUpperCase()} — ${d.image_tag ? d.image_tag.substring(0,7) : '?'}</div>
+                    <div class="data-row-title">Deployed to ${d.environment.toUpperCase()} <span style="color:var(--text-muted); font-weight:normal; margin-left:4px">(${d.image_tag ? d.image_tag.substring(0,7) : '?'})</span></div>
                     <div class="data-row-sub">Triggered by ${d.triggered_by || 'agent'}</div>
                 </div>
-                <div class="data-row-time">${timeAgo(d.created_at)}</div>
+                <span class="badge ${badgeCls}" style="margin-left:auto; margin-right:1.5rem;">${label}</span>
+                <div class="data-row-time" style="margin-left:0;">${timeAgo(d.created_at)}</div>
             </div>`;
         }).join('');
     } else {
@@ -969,7 +997,8 @@ async function confirmDisconnect() {
 /* ── Utilities ─────────────────────────────────────────────────────── */
 function timeAgo(dateStr) {
     if (!dateStr || dateStr === 'None') return '';
-    const d = new Date(dateStr);
+    const utcDateStr = dateStr.endsWith('Z') ? dateStr : dateStr + 'Z';
+    const d = new Date(utcDateStr);
     const now = new Date();
     const secs = Math.floor((now - d) / 1000);
     if (secs < 60) return 'just now';
