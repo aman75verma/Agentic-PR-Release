@@ -5,6 +5,8 @@ name: Agentic Merge Notification
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '.github/workflows/**'
 
 jobs:
   notify-agent:
