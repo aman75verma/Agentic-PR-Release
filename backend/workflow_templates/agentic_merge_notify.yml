@@ -1,0 +1,21 @@
+# Installed by Agentic PR Release — https://github.com/aman75verma/Agentic-PR-Release
+# This workflow notifies the Agentic PR Release server when code is merged to main.
+name: Agentic Merge Notification
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  notify-agent:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Agentic PR Release
+        run: |
+          curl -sS -X POST "{AGENT_URL}/webhook/merge" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "repo": "${{ github.repository }}",
+              "image_tag": "${{ github.sha }}",
+              "sender": "${{ github.actor }}"
+            }'

@@ -1,0 +1,76 @@
+# Installed by Agentic PR Release — https://github.com/aman75verma/Agentic-PR-Release
+# This workflow is triggered by the Agentic PR Release server to deploy your app.
+# Customize the "Build and Deploy" step for your infrastructure.
+name: Agentic Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment (dev/staging/prod)'
+        required: true
+        type: string
+      image_tag:
+        description: 'Git SHA or image tag to deploy'
+        required: true
+        type: string
+      callback_url:
+        description: 'Callback URL to report result'
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.image_tag }}
+
+      - name: Build and Deploy
+        id: deploy
+        run: |
+          echo "═══════════════════════════════════════════════"
+          echo "  Deploying to: ${{ inputs.environment }}"
+          echo "  Image/SHA:    ${{ inputs.image_tag }}"
+          echo "═══════════════════════════════════════════════"
+
+          # ┌──────────────────────────────────────────────┐
+          # │  CUSTOMIZE THIS SECTION FOR YOUR INFRA       │
+          # │                                              │
+          # │  Examples:                                   │
+          # │  • docker build -t myapp . && docker push    │
+          # │  • kubectl set image deploy/app myapp:tag    │
+          # │  • aws ecs update-service ...                │
+          # │  • ssh deploy@server 'git pull && restart'   │
+          # │                                              │
+          # │  For now, this is a placeholder that always  │
+          # │  succeeds. Replace with your deploy logic.   │
+          # └──────────────────────────────────────────────┘
+
+          echo "✅ Deploy step completed (customize me!)"
+
+      - name: Report success to Agentic PR Release
+        if: success()
+        run: |
+          curl -sS -X POST "${{ inputs.callback_url }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "repo": "${{ github.repository }}",
+              "environment": "${{ inputs.environment }}",
+              "image_tag": "${{ inputs.image_tag }}",
+              "status": "success"
+            }'
+
+      - name: Report failure to Agentic PR Release
+        if: failure()
+        run: |
+          curl -sS -X POST "${{ inputs.callback_url }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "repo": "${{ github.repository }}",
+              "environment": "${{ inputs.environment }}",
+              "image_tag": "${{ inputs.image_tag }}",
+              "status": "failure"
+            }'

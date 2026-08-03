@@ -1,0 +1,22 @@
+# Installed by Agentic PR Release — https://github.com/aman75verma/Agentic-PR-Release
+# This workflow notifies the Agentic PR Release server when a PR is opened or updated.
+name: Agentic PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  notify-agent:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Agentic PR Release
+        run: |
+          curl -sS -X POST "{AGENT_URL}/webhook/pr" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "pr_number": ${{ github.event.pull_request.number }},
+              "repo": "${{ github.repository }}",
+              "pr_title": "${{ github.event.pull_request.title }}",
+              "sender": "${{ github.actor }}"
+            }'
