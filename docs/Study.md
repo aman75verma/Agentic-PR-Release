@@ -14,8 +14,6 @@
 | Docker fundamentals | **Medium** | Understand: Dockerfile → `docker build` → image → `docker run` → container. Know the `-e` flag for env vars, `-p` for port mapping. |
 | Health check endpoints | **Conceptual** | Why `/health` exists in production (load balancers, orchestrators check it). 5 min read. |
 
-**Total prep: ~1-2 hours if you know Python.**
-
 ---
 
 ## Chunk 2 — Environments (docker-compose)
@@ -26,8 +24,6 @@
 | Multi-service Docker apps | **Basic** | How multiple services share a network, differ by env vars. |
 | Staged deployments (dev/staging/prod) | **Conceptual** | Why companies have multiple environments and gates between them. |
 
-**Total prep: ~1 hour.**
-
 ---
 
 ## Chunk 3 — Database (PostgreSQL via Docker)
@@ -37,8 +33,6 @@
 | SQL basics | **Basic** | `CREATE TABLE`, `INSERT`, `SELECT`, `CHECK` constraints. |
 | Postgres + Docker | **Basic** | Running the `postgres` image, mounting initialization scripts to `/docker-entrypoint-initdb.d/`. |
 | Python `psycopg2` module | **Basic** | How to connect to Postgres from Python, execute queries, and commit. |
-
-**Total prep: ~30-45 min if you know SQL.**
 
 ---
 
@@ -51,8 +45,6 @@
 | Slack Incoming Webhooks | **Basic** | One POST request with `{"text": "message"}` to a webhook URL. 5 min setup. |
 | HTTP requests in Python | **Basic** | `requests.get()`, `requests.post()`, response status codes. |
 
-**Total prep: ~2-3 hours.**
-
 ---
 
 ## Chunk 5 & 6 — Agent Logic + Backend
@@ -64,8 +56,6 @@
 | FastAPI (webhooks, POST endpoints) | **Medium** | Receiving JSON payloads, async handlers, background tasks. |
 | Agent loop pattern | **Medium** | The "prompt → LLM → tool call → execute → feed result back → repeat" loop. Understand this conceptually before coding. |
 
-**Total prep: ~3-4 hours. This is the hardest chunk.**
-
 ---
 
 ## Chunk 7 — GitHub Actions
@@ -76,24 +66,21 @@
 | Webhooks concept | **Basic** | Server A calls Server B's URL when something happens. GitHub Actions → your backend. |
 | Docker image registries | **Basic** | What DockerHub/GHCR is, `docker push`, `docker pull`. |
 
-**Total prep: ~1-2 hours.**
-
 ---
 
-## Chunk 8 — Dashboard
+## Multi-Tenant SaaS Pivot (SmartChunks Phase)
+
+As we transition from a single-tenant demo to a real product where any GitHub user can monitor their own repositories, we introduced Several new concepts:
 
 | Topic | Depth | What to Know |
 |---|---|---|
-| React basics (if using React) | **Basic** | Components, `useState`, `useEffect`, `fetch()`. OR just use plain HTML + JS. |
-| Fetching API data | **Basic** | `fetch('/admin/audit-log')` → render as table. |
-
-**Total prep: ~1 hour. Keep this minimal.**
-
----
-
-## Chunk 9 — Eval / Demo
-
-No new concepts. This is just running your 4 test scenarios and recording results.
+| GitHub OAuth Flow | **Medium** | How OAuth works: User clicks login → redirected to GitHub to authorize → GitHub redirects back with a `code` → our server exchanges `code` for an `access_token` and fetches user profile. |
+| Session Management (Cookies) | **Basic** | How to set `Set-Cookie` headers via FastAPI responses. Difference between `httponly` (JS can't read it) and standard cookies. |
+| Cryptography & `itsdangerous` | **Medium** | Instead of standard JWTs, we use `itsdangerous.URLSafeTimedSerializer` to cryptographically sign a simple `user_id` inside a cookie. This prevents tampering. |
+| Multi-Tenant Database Design | **Basic** | Updating schemas (e.g., `pr_reviews`, `deployments`) to include a `repo` column and establishing foreign keys to a new `users` table. |
+| Token Routing & Webhooks | **Advanced** | Webhooks don't have session cookies. When a webhook arrives from a repo, our server must extract the `repo` name from the payload, look up which `user_id` enabled it, and fetch *their* `access_token` to make GitHub API calls. |
+| GitHub Contents API | **Medium** | Using the `PUT /repos/{owner}/{repo}/contents/{path}` API endpoint to programmatically commit workflow YAML files directly into users' repositories when they click "Enable" on the dashboard. |
+| Event-Driven Deployment Architecture (Approach B) | **Advanced** | Shifting from running `docker-compose` locally to using `workflow_dispatch` API calls to trigger a deployment YAML in the user's repo. Our pipeline becomes stateful, waiting for the GitHub Action to call our `/webhook/deploy-result` endpoint before the LLM decides to promote to the next environment or rollback. |
 
 ---
 
@@ -127,3 +114,6 @@ To decide whether to approve a PR or request changes, the LLM receives high-sign
 - **Fixed Rubric:** System prompt constraints (checking for hardcoded secrets, presence of tests, and reasonable diff size).
 - **PR Metadata:** PR title and description to understand intent.
 
+### 3. Securing Multi-Tenant Workflows
+- Our server acts on behalf of Alice for Alice's repos, and Bob for Bob's repos.
+- We never hardcode `GITHUB_TOKEN` anymore. Each API call (like getting diffs or posting comments) dynamically injects the appropriate `access_token` by performing a database lookup on the `repo` field passed by the incoming webhook.

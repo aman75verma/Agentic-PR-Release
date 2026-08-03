@@ -26,3 +26,19 @@
 - **Implemented Chunk 7:**
   - Created `.github/workflows/pr_review.yml` to trigger the `review_agent` when a PR is opened.
   - Created `.github/workflows/merge_promotion.yml` to build/push a Docker image to Docker Hub and trigger the `promotion_agent` when a PR is merged to `main`.
+
+## 2026-08-03
+- **Pivot to Multi-Tenant SaaS (SmartChunks Phase)**
+- Re-architected project to support monitoring any public GitHub repository via GitHub OAuth.
+- **Implemented Chunk S1 (Cleanup):**
+  - Removed `demo-app/` and local `.github/workflows/`.
+  - Simplified `docker-compose.yml` to run only Postgres.
+  - Added multi-tenant patterns.
+- **Implemented Chunk S2 (DB Schema + Config):**
+  - Upgraded Postgres schema: created `users` and `enabled_repos` tables.
+  - Added `repo` column to `pr_reviews`, `deployments`, and `rollbacks` to track data on a per-repository basis.
+  - Updated `config.py` with GitHub OAuth App settings and removed hardcoded personal access tokens.
+- **Implemented Chunk S3 (Auth Module):**
+  - Built `auth.py` to handle the full GitHub OAuth flow (`/auth/github/login`, `/auth/github/callback`).
+  - Added signed session cookies via `itsdangerous.URLSafeTimedSerializer`.
+  - Upgraded `main.py` routing to handle webhook payloads dynamically based on repository names, looking up the appropriate user's `access_token` from the database.
