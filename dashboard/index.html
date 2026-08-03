@@ -781,7 +781,7 @@ async function runSetup(repo) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ repo, description: repoObj.description || '', language: repoObj.language || '' })
             });
-            if (result.status === 'ok' || result.workflows_installed) {
+            if (result.workflows_installed) {
                 // Mark all as done
                 for (let j = 0; j < 3; j++) {
                     document.getElementById(`setup-icon-${j}`).className = 'setup-step-icon done';
