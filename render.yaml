@@ -1,10 +1,3 @@
-databases:
-  - name: agentic-db
-    databaseName: auditlog
-    user: admin
-    plan: free
-    region: oregon # Default US region
-
 services:
   - type: web
     name: agentic-backend
@@ -14,27 +7,17 @@ services:
     buildCommand: "pip install -r backend/requirements.txt"
     startCommand: "uvicorn backend.main:app --host 0.0.0.0 --port $PORT"
     envVars:
-      # Database connection (automatically links to the database above)
+      # Database Connection (Input these manually in the Render dashboard)
       - key: DB_HOST
-        fromDatabase:
-          name: agentic-db
-          property: host
+        sync: false
       - key: DB_PORT
-        fromDatabase:
-          name: agentic-db
-          property: port
+        sync: false
       - key: DB_NAME
-        fromDatabase:
-          name: agentic-db
-          property: database
+        sync: false
       - key: DB_USER
-        fromDatabase:
-          name: agentic-db
-          property: user
+        sync: false
       - key: DB_PASSWORD
-        fromDatabase:
-          name: agentic-db
-          property: password
+        sync: false
 
       # Other backend env variables. These are left sync=false so you can input them securely in Render's dashboard.
       - key: GROQ_API_KEY
