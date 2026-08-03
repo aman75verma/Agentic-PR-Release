@@ -24,8 +24,5 @@ Based on the smoke test result, decide what to do next:
 - If the smoke test FAILED: roll back this environment and alert the team.
 
 You MUST respond with valid JSON only, no extra text. Use this exact format:
-{
-  "action": "promote" or "rollback" or "complete",
-  "reasoning": "1-2 sentences explaining your decision"
-}
+{{"action": "promote" or "rollback" or "complete", "reasoning": "1-2 sentences explaining your decision"}}
 """

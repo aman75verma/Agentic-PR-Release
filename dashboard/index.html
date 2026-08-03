@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agentic PR Release — Audit Dashboard</title>
+    <meta name="description" content="Real-time audit dashboard for the Agentic PR Release pipeline showing reviews, deployments, and rollbacks.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0f1117;
+            --bg-card: #1a1d27;
+            --bg-card-hover: #21242f;
+            --bg-table-header: #252836;
+            --bg-table-row-hover: #1e2130;
+            --border-color: #2a2d3a;
+            --text-primary: #e4e6ed;
+            --text-secondary: #8b8fa3;
+            --text-muted: #5c6078;
+            --accent-blue: #4f8ff7;
+            --accent-green: #34d399;
+            --accent-red: #f87171;
+            --accent-amber: #fbbf24;
+            --accent-purple: #a78bfa;
+            --gradient-start: #4f8ff7;
+            --gradient-end: #a78bfa;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        /* ── Header ───────────────────────────────────── */
+        .header {
+            background: linear-gradient(135deg, rgba(79,143,247,0.08), rgba(167,139,250,0.08));
+            border-bottom: 1px solid var(--border-color);
+            padding: 1.5rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            backdrop-filter: blur(12px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .header-logo {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+        }
+
+        .header h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.35rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: rgba(52, 211, 153, 0.1);
+            color: var(--accent-green);
+            border: 1px solid rgba(52, 211, 153, 0.2);
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .refresh-btn {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 0.4rem 0.85rem;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .refresh-btn:hover {
+            background: var(--bg-card-hover);
+            color: var(--text-primary);
+            border-color: var(--accent-blue);
+        }
+
+        .refresh-btn.loading .refresh-icon {
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* ── Stats Bar ────────────────────────────────── */
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            padding: 1.5rem 2rem;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.25rem;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            border-color: var(--accent-blue);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(79, 143, 247, 0.08);
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        .stat-value.blue { color: var(--accent-blue); }
+        .stat-value.green { color: var(--accent-green); }
+        .stat-value.red { color: var(--accent-red); }
+        .stat-value.purple { color: var(--accent-purple); }
+
+        /* ── Main Content ─────────────────────────────── */
+        .main {
+            padding: 0 2rem 2rem;
+        }
+
+        /* ── Tabs ─────────────────────────────────────── */
+        .tab-bar {
+            display: flex;
+            gap: 0.25rem;
+            padding: 0.25rem;
+            background: var(--bg-card);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 1.5rem;
+            width: fit-content;
+        }
+
+        .tab-btn {
+            padding: 0.6rem 1.2rem;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-family: inherit;
+            font-size: 0.85rem;
+            font-weight: 500;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            color: white;
+            font-weight: 600;
+        }
+
+        .tab-count {
+            font-size: 0.7rem;
+            padding: 0.1rem 0.45rem;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.15);
+        }
+
+        /* ── Table ────────────────────────────────────── */
+        .table-wrapper {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: var(--bg-table-header);
+        }
+
+        th {
+            text-align: left;
+            padding: 0.85rem 1.25rem;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        td {
+            padding: 0.85rem 1.25rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            border-bottom: 1px solid rgba(42, 45, 58, 0.5);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background: var(--bg-table-row-hover);
+        }
+
+        /* ── Badges ───────────────────────────────────── */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.2rem 0.6rem;
+            border-radius: 6px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+
+        .badge-approved {
+            background: rgba(52, 211, 153, 0.12);
+            color: var(--accent-green);
+            border: 1px solid rgba(52, 211, 153, 0.2);
+        }
+
+        .badge-changes {
+            background: rgba(248, 113, 113, 0.12);
+            color: var(--accent-red);
+            border: 1px solid rgba(248, 113, 113, 0.2);
+        }
+
+        .badge-deployed, .badge-smoke_test_passed {
+            background: rgba(52, 211, 153, 0.12);
+            color: var(--accent-green);
+            border: 1px solid rgba(52, 211, 153, 0.2);
+        }
+
+        .badge-smoke_test_failed {
+            background: rgba(248, 113, 113, 0.12);
+            color: var(--accent-red);
+            border: 1px solid rgba(248, 113, 113, 0.2);
+        }
+
+        .badge-dev {
+            background: rgba(79, 143, 247, 0.12);
+            color: var(--accent-blue);
+            border: 1px solid rgba(79, 143, 247, 0.2);
+        }
+
+        .badge-staging {
+            background: rgba(251, 191, 36, 0.12);
+            color: var(--accent-amber);
+            border: 1px solid rgba(251, 191, 36, 0.2);
+        }
+
+        .badge-prod {
+            background: rgba(167, 139, 250, 0.12);
+            color: var(--accent-purple);
+            border: 1px solid rgba(167, 139, 250, 0.2);
+        }
+
+        .reasoning-text {
+            max-width: 350px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .reasoning-text.expanded {
+            white-space: normal;
+            overflow: visible;
+        }
+
+        .mono {
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 0.78rem;
+            color: var(--accent-blue);
+        }
+
+        .time-ago {
+            color: var(--text-muted);
+            font-size: 0.78rem;
+        }
+
+        /* ── Empty State ──────────────────────────────── */
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-muted);
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .empty-state p {
+            font-size: 0.9rem;
+        }
+
+        /* ── Loading ──────────────────────────────────── */
+        .skeleton {
+            background: linear-gradient(90deg, var(--bg-card) 25%, var(--bg-card-hover) 50%, var(--bg-card) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s ease-in-out infinite;
+            border-radius: 6px;
+            height: 1rem;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* ── Responsive ───────────────────────────────── */
+        @media (max-width: 768px) {
+            .header { padding: 1rem; }
+            .stats-bar { padding: 1rem; }
+            .main { padding: 0 1rem 1rem; }
+            .reasoning-text { max-width: 180px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <div class="header-logo">🤖</div>
+            <h1>Agentic PR Release</h1>
+        </div>
+        <div class="header-right">
+            <div class="status-badge">
+                <span class="status-dot"></span>
+                Pipeline Active
+            </div>
+            <button class="refresh-btn" id="refreshBtn" onclick="fetchData()">
+                <span class="refresh-icon">↻</span>
+                Refresh
+            </button>
+        </div>
+    </header>
+
+    <!-- Stats -->
+    <div class="stats-bar">
+        <div class="stat-card">
+            <div class="stat-label">Total Reviews</div>
+            <div class="stat-value blue" id="statReviews">—</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Deployments</div>
+            <div class="stat-value green" id="statDeploys">—</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Rollbacks</div>
+            <div class="stat-value red" id="statRollbacks">—</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Success Rate</div>
+            <div class="stat-value purple" id="statSuccess">—</div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main">
+        <!-- Tabs -->
+        <div class="tab-bar">
+            <button class="tab-btn active" id="tabReviews" onclick="switchTab('reviews')">
+                🔍 Reviews <span class="tab-count" id="countReviews">0</span>
+            </button>
+            <button class="tab-btn" id="tabDeployments" onclick="switchTab('deployments')">
+                🚀 Deployments <span class="tab-count" id="countDeployments">0</span>
+            </button>
+            <button class="tab-btn" id="tabRollbacks" onclick="switchTab('rollbacks')">
+                ⏪ Rollbacks <span class="tab-count" id="countRollbacks">0</span>
+            </button>
+        </div>
+
+        <!-- Tables -->
+        <div id="tableContainer">
+            <div class="empty-state">
+                <div class="empty-state-icon">📡</div>
+                <p>Loading audit log data...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+        let currentData = { reviews: [], deployments: [], rollbacks: [] };
+        let activeTab = 'reviews';
+
+        // ── Fetch Data ──────────────────────────────────
+        async function fetchData() {
+            const btn = document.getElementById('refreshBtn');
+            btn.classList.add('loading');
+
+            try {
+                const res = await fetch(`${API_BASE}/admin/audit-log`);
+                currentData = await res.json();
+                updateStats();
+                updateCounts();
+                renderTable();
+            } catch (err) {
+                document.getElementById('tableContainer').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚠️</div>
+                        <p>Could not connect to backend at ${API_BASE}/admin/audit-log</p>
+                        <p style="margin-top:0.5rem;font-size:0.8rem;">Make sure the FastAPI server is running.</p>
+                    </div>`;
+            } finally {
+                setTimeout(() => btn.classList.remove('loading'), 500);
+            }
+        }
+
+        // ── Stats ───────────────────────────────────────
+        function updateStats() {
+            document.getElementById('statReviews').textContent = currentData.reviews.length;
+            document.getElementById('statDeploys').textContent = currentData.deployments.length;
+            document.getElementById('statRollbacks').textContent = currentData.rollbacks.length;
+
+            const passed = currentData.deployments.filter(d => d.status === 'smoke_test_passed').length;
+            const total = currentData.deployments.length;
+            const rate = total > 0 ? Math.round((passed / total) * 100) : 0;
+            document.getElementById('statSuccess').textContent = total > 0 ? `${rate}%` : '—';
+        }
+
+        function updateCounts() {
+            document.getElementById('countReviews').textContent = currentData.reviews.length;
+            document.getElementById('countDeployments').textContent = currentData.deployments.length;
+            document.getElementById('countRollbacks').textContent = currentData.rollbacks.length;
+        }
+
+        // ── Tabs ────────────────────────────────────────
+        function switchTab(tab) {
+            activeTab = tab;
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`tab${tab.charAt(0).toUpperCase() + tab.slice(1)}`).classList.add('active');
+            renderTable();
+        }
+
+        // ── Time Formatting ─────────────────────────────
+        function timeAgo(dateStr) {
+            const date = new Date(dateStr);
+            const now = new Date();
+            const seconds = Math.floor((now - date) / 1000);
+            if (seconds < 60) return `${seconds}s ago`;
+            if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+            if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+            return `${Math.floor(seconds / 86400)}d ago`;
+        }
+
+        // ── Badge Helpers ───────────────────────────────
+        function verdictBadge(verdict) {
+            if (verdict === 'approved') return `<span class="badge badge-approved">✓ Approved</span>`;
+            return `<span class="badge badge-changes">✗ Changes Requested</span>`;
+        }
+
+        function statusBadge(status) {
+            const cls = `badge-${status.replace(/ /g, '_')}`;
+            const label = status.replace(/_/g, ' ');
+            return `<span class="badge ${cls}">${label}</span>`;
+        }
+
+        function envBadge(env) {
+            return `<span class="badge badge-${env}">${env}</span>`;
+        }
+
+        // ── Render Tables ───────────────────────────────
+        function renderTable() {
+            const container = document.getElementById('tableContainer');
+
+            if (activeTab === 'reviews') {
+                if (currentData.reviews.length === 0) {
+                    container.innerHTML = emptyState('No PR reviews yet', '🔍');
+                    return;
+                }
+                container.innerHTML = `
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>PR #</th>
+                                <th>Verdict</th>
+                                <th>Reasoning</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${currentData.reviews.map(r => `
+                                <tr>
+                                    <td class="mono">#${r.id}</td>
+                                    <td class="mono">PR-${r.pr_number}</td>
+                                    <td>${verdictBadge(r.verdict)}</td>
+                                    <td><span class="reasoning-text" onclick="this.classList.toggle('expanded')">${r.reasoning}</span></td>
+                                    <td><span class="time-ago" title="${r.created_at}">${timeAgo(r.created_at)}</span></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>`;
+            }
+
+            if (activeTab === 'deployments') {
+                if (currentData.deployments.length === 0) {
+                    container.innerHTML = emptyState('No deployments yet', '🚀');
+                    return;
+                }
+                container.innerHTML = `
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Environment</th>
+                                <th>Image Tag</th>
+                                <th>Status</th>
+                                <th>Triggered By</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${currentData.deployments.map(d => `
+                                <tr>
+                                    <td class="mono">#${d.id}</td>
+                                    <td>${envBadge(d.environment)}</td>
+                                    <td class="mono">${d.image_tag ? d.image_tag.substring(0, 12) : '—'}</td>
+                                    <td>${statusBadge(d.status)}</td>
+                                    <td>${d.triggered_by || 'agent'}</td>
+                                    <td><span class="time-ago" title="${d.created_at}">${timeAgo(d.created_at)}</span></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>`;
+            }
+
+            if (activeTab === 'rollbacks') {
+                if (currentData.rollbacks.length === 0) {
+                    container.innerHTML = emptyState('No rollbacks recorded', '⏪');
+                    return;
+                }
+                container.innerHTML = `
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Deployment ID</th>
+                                <th>Reverted To</th>
+                                <th>Reasoning</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${currentData.rollbacks.map(r => `
+                                <tr>
+                                    <td class="mono">#${r.id}</td>
+                                    <td class="mono">#${r.deployment_id}</td>
+                                    <td class="mono">${r.reverted_to_tag ? r.reverted_to_tag.substring(0, 12) : '—'}</td>
+                                    <td><span class="reasoning-text" onclick="this.classList.toggle('expanded')">${r.reasoning}</span></td>
+                                    <td><span class="time-ago" title="${r.created_at}">${timeAgo(r.created_at)}</span></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>`;
+            }
+        }
+
+        function emptyState(text, icon) {
+            return `<div class="empty-state"><div class="empty-state-icon">${icon}</div><p>${text}</p></div>`;
+        }
+
+        // ── Init ────────────────────────────────────────
+        fetchData();
+        setInterval(fetchData, 15000);  // Auto-refresh every 15 seconds
+    </script>
+</body>
+</html>

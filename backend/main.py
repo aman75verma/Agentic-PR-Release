@@ -6,13 +6,35 @@ Endpoints:
   POST /webhook/merge  — GitHub webhook: triggered on merge → runs promotion agent loop
   GET  /admin/audit-log — Returns recent reviews, deployments, and rollbacks for the dashboard
   GET  /health          — Backend health check
+  GET  /                — Serves the dashboard UI
 """
 
+import os
 from fastapi import FastAPI, Request, BackgroundTasks
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from backend.agent import review_agent, promotion_agent
 from backend.tools import db_tool
 
 app = FastAPI(title="Agentic PR Release — Backend")
+
+# Allow the dashboard to call our API from any origin (for local dev)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Serve the dashboard static files
+DASHBOARD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "dashboard")
+
+
+@app.get("/")
+def serve_dashboard():
+    """Serve the dashboard UI."""
+    return FileResponse(os.path.join(DASHBOARD_DIR, "index.html"))
 
 
 @app.get("/health")
