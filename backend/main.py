@@ -33,7 +33,28 @@ from backend import repo_manager
 from backend.tools import db_tool
 from backend.config import AGENT_PUBLIC_URL
 
-app = FastAPI(title="Agentic PR Release — Backend")
+from contextlib import asynccontextmanager
+import psycopg2
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize DB schema on startup
+    from backend.auth import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
+    schema_path = os.path.join(os.path.dirname(__file__), "db", "schema_pg.sql")
+    if os.path.exists(schema_path):
+        try:
+            conn = psycopg2.connect(host=DB_HOST, port=DB_PORT, dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD)
+            with conn.cursor() as cur:
+                with open(schema_path, "r") as f:
+                    cur.execute(f.read())
+            conn.commit()
+            conn.close()
+            print("Database schema initialized successfully.")
+        except Exception as e:
+            print(f"Failed to initialize database: {e}")
+    yield
+
+app = FastAPI(title="Agentic PR Release — Backend", lifespan=lifespan)
 
 # Allow the dashboard to call our API from any origin (for local dev)
 app.add_middleware(

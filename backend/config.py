@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 # Always find .env relative to this file's directory (backend/)
 _ENV_PATH = Path(__file__).resolve().parent / ".env"
-load_dotenv(_ENV_PATH)
+load_dotenv(_ENV_PATH, override=True)
 
 # Groq LLM (Chunk 5)
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")

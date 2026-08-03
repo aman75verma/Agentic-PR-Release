@@ -1,0 +1,49 @@
+databases:
+  - name: agentic-db
+    databaseName: auditlog
+    user: admin
+    plan: free
+    region: oregon # Default US region
+
+services:
+  - type: web
+    name: agentic-backend
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: "pip install -r backend/requirements.txt"
+    startCommand: "uvicorn backend.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      # Database connection (automatically links to the database above)
+      - key: DB_HOST
+        fromDatabase:
+          name: agentic-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: agentic-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: agentic-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: agentic-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: agentic-db
+          property: password
+
+      # Other backend env variables. These are left sync=false so you can input them securely in Render's dashboard.
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: AGENT_PUBLIC_URL
+        value: "https://agentic-backend.onrender.com" # This will be the actual URL once deployed
